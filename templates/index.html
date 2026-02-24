@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RIS Attendance System</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f0f0; text-align: center; padding: 20px; }
+        .card { background: white; max-width: 450px; margin: auto; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        
+        /* This is the logo styling */
+        .school-logo { width: 120px; height: auto; margin-bottom: 15px; }
+        
+        input[type="text"] { width: 90%; padding: 12px; font-size: 16px; border: 2px solid #ddd; border-radius: 8px; }
+        .suggestions { border: 1px solid #ddd; background: white; max-width: 90%; margin: auto; display: none; border-radius: 0 0 8px 8px; }
+        .sug-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; text-align: left; }
+        .sug-item:hover { background: #f8f8f8; }
+        .btn-history { margin-top: 30px; padding: 12px 25px; background: #607D8B; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index: 1000; }
+        .modal-content { 
+            background:white; margin:5% auto; padding:20px; width:90%; max-width:600px; 
+            border-radius:12px; max-height: 85vh; display: flex; flex-direction: column; 
+        }
+        .log-container { overflow-y: auto; margin-top: 15px; border: 1px solid #ddd; flex-grow: 1; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { position: sticky; top: 0; background: #eeeeee; padding: 12px; border-bottom: 2px solid #ccc; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+        .close-btn { background: #ff4444; color: white; border: none; padding: 5px 12px; border-radius: 4px; float: right; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <img src="/static/logo.png" alt="Royalton Logo" class="school-logo">
+    
+    <h2>ATTENDACE SYSTEM</h2>
+    <p><b>TYPE STUDENT'S NAME:</b></p>
+    <input type="text" id="searchBox" autocomplete="off" onkeyup="updateSuggestions(this.value)">
+    <div id="suggestionList" class="suggestions"></div>
+    <br>
+    <button class="btn-history" onclick="openHistory()">VIEW HISTORY LOG</button>
+    <p id="status" style="color: green; margin-top: 15px;">System Ready</p>
+</div>
+
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <div>
+            <button class="close-btn" onclick="closeHistory()">X</button>
+            <h3>Attendance Log</h3>
+            <input type="date" id="logDate" style="padding: 8px;">
+            <button onclick="loadLogs()" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 5px;">Show Logs</button>
+        </div>
+        <div class="log-container">
+            <table>
+                <thead>
+                    <tr><th>ID/Name</th><th>Status</th><th>Time In</th></tr>
+                </thead>
+                <tbody id="logBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateSuggestions(val) {
+        let list = document.getElementById('suggestionList');
+        if (val.length < 1) { list.style.display = 'none'; return; }
+        fetch('/search?q=' + val).then(res => res.json()).then(data => {
+            list.innerHTML = '';
+            list.style.display = data.length > 0 ? 'block' : 'none';
+            data.forEach(name => {
+                let div = document.createElement('div');
+                div.className = 'sug-item';
+                div.innerText = name;
+                div.onclick = () => logAttendance(name);
+                list.appendChild(div);
+            });
+        });
+    }
+
+    function logAttendance(name) {
+        document.getElementById('suggestionList').style.display = 'none';
+        fetch('/log_attendance', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        }).then(res => res.json()).then(data => {
+            alert(data.message);
+            document.getElementById('status').innerText = "Last Scan: " + data.last_scan;
+            document.getElementById('searchBox').value = '';
+        });
+    }
+
+    function openHistory() { 
+        document.getElementById('historyModal').style.display = 'block';
+        document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
+    }
+    function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
+
+    function loadLogs() {
+        let date = document.getElementById('logDate').value;
+        fetch('/get_logs?date=' + date).then(res => res.json()).then(data => {
+            let body = document.getElementById('logBody');
+            body.innerHTML = '';
+            if (data.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">No entries found.</td></tr>';
+                return;
+            }
+            data.forEach(row => {
+                body.innerHTML += `<tr><td>${row.id}</td><td><b style="color:green;">Present</b></td><td>${row.time}</td></tr>`;
+            });
+        });
+    }
+</script>
+</body>
+</html>
