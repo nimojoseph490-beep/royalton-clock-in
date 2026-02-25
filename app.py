@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import psycopg2
 import datetime
 from flask import Flask, render_template, request, jsonify
 
@@ -7,15 +7,26 @@ app = Flask(__name__)
 
 # Helper to connect to your existing database
 def get_db_connection():
-    conn = sqlite3.connect('royalton_school.db')
-    conn.row_factory = sqlite3.Row
+    # This uses the 'DATABASE_URL' we set in the Render dashboard
+    database_url = os.environ.get('DATABASE_URL')
+    conn = psycopg2.connect(database_url)
     return conn
 
 # Ensure the table exists
 def init_db():
     conn = get_db_connection()
-    conn.execute("CREATE TABLE IF NOT EXISTS attendance (student_id TEXT, date TEXT, time TEXT)")
+    cur = conn.cursor()
+    # Note the 'SERIAL PRIMARY KEY' - this is specific to PostgreSQL
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id SERIAL PRIMARY KEY,
+            student_id TEXT,
+            date TEXT,
+            time TEXT
+        )
+    """)
     conn.commit()
+    cur.close()
     conn.close()
 
 @app.route('/')
@@ -71,7 +82,8 @@ def get_logs():
     # Convert database rows into a list the website can read
     return jsonify([{"id": r["student_id"], "time": r["time"]} for r in rows])
 
-if __name__ == '__main__':
-    import os
-    port = int(os.environ.get("PORT", 5000))
+
+if __name__ == "__main__":
+    # Get the port from Render's environment, or use 10000 as default
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
