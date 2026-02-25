@@ -6,7 +6,6 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 
 # MANDATORY FOR RENDER SQLITE: Use /tmp folder
-# Render will crash if you try to write to the root folder.
 DB_PATH = '/tmp/attendance.db'
 
 def get_db_connection():
@@ -14,7 +13,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# We wrap this in a try/except so if the DB fails, the PORT still opens
 def init_db():
     try:
         conn = get_db_connection()
@@ -23,7 +21,6 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print(f"Successfully connected to database at {DB_PATH}")
     except Exception as e:
         print(f"Startup Database Error: {e}")
 
@@ -49,6 +46,9 @@ def log_attendance():
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         now_time = datetime.datetime.now().strftime("%I:%M %p")
         
+        # Generate ID just like your original Tkinter version
+        student_id = f"RIS-{display_name[:3].upper()}001"
+        
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("INSERT INTO attendance (student_id, date, time) VALUES (?, ?, ?)", 
@@ -56,7 +56,21 @@ def log_attendance():
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({"status": "success", "message": f"Logged {display_name}"})
+
+        # Build the full detailed success message for the popup
+        full_message = (
+            f"Student: {display_name}\n"
+            f"ID: {student_id}\n"
+            f"Time: {now_time}\n\n"
+            "Enjoy your day at school! 🎓"
+        )
+        
+        # We send 'last_scan' back so the website can update the label
+        return jsonify({
+            "status": "success", 
+            "message": full_message, 
+            "last_scan": display_name
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
@@ -70,18 +84,26 @@ def history():
         cur.close()
         conn.close()
 
-        table_html = "<h1>Attendance History</h1><table border='1'><tr><th>ID</th><th>Date</th><th>Time</th></tr>"
+        table_html = """
+        <html>
+        <head><style>
+            table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; }
+            th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+            th { background-color: #f2f2f2; }
+        </style></head>
+        <body>
+            <h1>Attendance History (Last 100)</h1>
+            <table><tr><th>Student Name</th><th>Date</th><th>Time</th></tr>
+        """
         for r in rows:
-            table_html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>"
-        return table_html + "</table><br><a href='/'>Back</a>"
+            table_html += f"<tr><td>{r['student_id']}</td><td>{r['date']}</td><td>{r['time']}</td></tr>"
+        
+        return table_html + "</table><br><a href='/'>Back to Scanner</a></body></html>"
     except Exception as e:
-        return f"Error: {e}"
+        return f"Error loading history: {e}"
 
-# Move init_db down here so the app is ready to start immediately
 init_db()
 
 if __name__ == "__main__":
-    # If this part doesn't run, Render gives the "No open ports" error
     port = int(os.environ.get("PORT", 10000))
-    print(f"Starting app on port {port}...")
     app.run(host='0.0.0.0', port=port)
