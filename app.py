@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import psycopg2
 import datetime
 from flask import Flask, render_template, request, jsonify
 
@@ -7,8 +7,8 @@ app = Flask(__name__)
 
 # Helper to connect to your existing database
 def get_db_connection():
-    conn = sqlite3.connect('royalton_school.db')
-    conn.row_factory = sqlite3.Row
+    database_url = os.environ.get('DATABASE_URL')
+    conn = psycopg2.connect(database_url)
     return conn
 
 # Ensure the table exists
