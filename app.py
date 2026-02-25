@@ -14,8 +14,10 @@ def get_db_connection():
 # Ensure the table exists
 def init_db():
     conn = get_db_connection()
-    conn.execute("CREATE TABLE IF NOT EXISTS attendance (student_id TEXT, date TEXT, time TEXT)")
+    cur = conn.cursor() # Add this line
+    cur.execute("CREATE TABLE IF NOT EXISTS attendance (student_id TEXT, date TEXT, time TEXT)")
     conn.commit()
+    cur.close() # Close the cursor
     conn.close()
 
 @app.route('/')
@@ -23,6 +25,7 @@ def index():
     return render_template('index.html')
 
 # Mimics your Tkinter update_suggestions
+init_db()
 @app.route('/search')
 def search():
     query = request.args.get('q', '').lower()
@@ -33,7 +36,6 @@ def search():
                 display_name = file.replace('_', ' ').replace('.png', '')
                 suggestions.append(display_name)
     return jsonify(suggestions)
-
 # Mimics your Tkinter process_qr_scan / save_to_db
 @app.route('/log_attendance', methods=['POST'])
 def log_attendance():
@@ -45,9 +47,10 @@ def log_attendance():
     student_id = f"RIS-{display_name[:3].upper()}001"
     
     conn = get_db_connection()
-    conn.execute("INSERT INTO attendance (student_id, date, time) VALUES (?, ?, ?)", 
-                (display_name, today, now_time))
-    conn.commit()
+    cur = conn.cursor()  # Added cursor
+    cur.execute("SELECT student_id, time FROM attendance WHERE date = %s", (today,))
+    rows = cur.fetchall() # Get rows through cursor
+    cur.close()
     conn.close()
 
     # The exact message from your Tkinter app
@@ -65,12 +68,11 @@ def log_attendance():
 def get_logs():
     selected_date = request.args.get('date') # Format from web: YYYY-MM-DD
     conn = get_db_connection()
-    rows = conn.execute("SELECT student_id, time FROM attendance WHERE date = ?", (selected_date,)).fetchall()
+    rows = conn.execute("SELECT student_id, time FROM attendance WHERE date = %s", (selected_date,)).fetchall()
     conn.close()
     
     # Convert database rows into a list the website can read
-    return jsonify([{"id": r["student_id"], "time": r["time"]} for r in rows])
-
+    return jsonify([{"id": r[0], "time": r[1]} for r in rows])
 
 if __name__ == "__main__":
     # Get the port from Render's environment, or use 10000 as default
