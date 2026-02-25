@@ -42,6 +42,22 @@ def log_attendance():
     display_name = request.json.get('name')
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     now_time = datetime.datetime.now().strftime("%I:%M %p")
+
+@app.route('/history')
+def history():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Gets the last 50 scans
+    cur.execute("SELECT student_id, date, time FROM attendance ORDER BY date DESC, time DESC LIMIT 50")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    # Simple way to show it on screen
+    output = "<h1>Attendance History</h1>"
+    for r in rows:
+        output += f"<p>{r[0]} - {r[1]} at {r[2]}</p>"
+    return output
     
     # Generate ID just like your Tkinter code
     student_id = f"RIS-{display_name[:3].upper()}001"
